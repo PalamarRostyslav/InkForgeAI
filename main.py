@@ -2,7 +2,6 @@ import sys
 import asyncio
 import signal
 from PyQt6.QtWidgets import QApplication, QMessageBox
-from PyQt6.QtCore import QTimer
 from qasync import QEventLoop, asyncSlot
 
 from frontend.main_window import MainWindow
@@ -26,8 +25,11 @@ class TattooAIApp:
             self.show_api_key_error()
             sys.exit(1)
         
-        # Create main window
-        self.window = MainWindow(self.config.openai_api_key)
+        # Create main window with both API keys
+        self.window = MainWindow(
+            self.config.openai_api_key,
+            self.config.anthropic_api_key
+        )
         
         # Make async slots work
         self._setup_async_handlers()
@@ -39,6 +41,7 @@ class TattooAIApp:
         original_on_session = self.window.on_session_selected
         original_on_new = self.window.on_new_session
         original_on_delete = self.window.on_session_deleted
+        original_on_analyze = self.window.on_analyze_image
         
         @asyncSlot(str, object, object)
         async def async_generate(prompt, size, quality):
@@ -56,6 +59,10 @@ class TattooAIApp:
         async def async_delete(session_id):
             await original_on_delete(session_id)
         
+        @asyncSlot(str, str)
+        async def async_analyze(image_path, prompt):
+            await original_on_analyze(image_path, prompt)
+        
         # Replace with async versions
         self.window.input_widget.generate_clicked.disconnect()
         self.window.input_widget.generate_clicked.connect(async_generate)
@@ -68,6 +75,9 @@ class TattooAIApp:
         
         self.window.sidebar.session_deleted.disconnect()
         self.window.sidebar.session_deleted.connect(async_delete)
+        
+        self.window.gallery.image_analyze_requested.disconnect()
+        self.window.gallery.image_analyze_requested.connect(async_analyze)
     
     def show_api_key_error(self):
         """Show error dialog for missing API key"""
@@ -85,7 +95,6 @@ class TattooAIApp:
         """Run the application"""
         self.window.show()
         
-        # Handle Ctrl+C gracefully
         signal.signal(signal.SIGINT, signal.SIG_DFL)
         
         with self.loop:

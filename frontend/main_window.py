@@ -1,4 +1,3 @@
-import sys
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QSplitter
@@ -12,15 +11,22 @@ from frontend.widgets.input_widget import InputWidget
 from frontend.widgets.image_gallery import ImageGallery
 from backend.chat_service import ChatService
 from backend.openai_service import OpenAIService
-
+from mcp_impl.conversation_mcp import TattooAnalysisMCP, MCPClient
 
 class MainWindow(QMainWindow):
-    def __init__(self, openai_api_key: str):
+    def __init__(self, openai_api_key: str, anthropic_api_key: str = None):
         super().__init__()
         
         # Initialize services
         self.chat_service = ChatService()
         self.openai_service = OpenAIService(openai_api_key)
+        
+        # Initialize MCP if Anthropic API key is provided
+        self.mcp_server = None
+        self.mcp_client = None
+        if anthropic_api_key:
+            self.mcp_server = TattooAnalysisMCP(self.chat_service, anthropic_api_key)
+            self.mcp_client = MCPClient(self.mcp_server)
         
         # Current session
         self.current_session = None
@@ -83,6 +89,7 @@ class MainWindow(QMainWindow):
         
         # Gallery
         self.gallery = ImageGallery()
+        self.gallery.image_analyze_requested.connect(self.on_analyze_image)
         
         # Add to splitter
         splitter.addWidget(chat_container)
@@ -117,6 +124,7 @@ class MainWindow(QMainWindow):
         
         for message in messages:
             if message.image_id and message.image_id in image_map:
+                # This is a generated image message
                 image = image_map[message.image_id]
                 if message.content.startswith("Generated tattoo: "):
                     original_prompt = message.content.replace("Generated tattoo: ", "")
@@ -164,7 +172,6 @@ class MainWindow(QMainWindow):
         conversation_history = []
         
         for msg in messages[:-1]:
-            # Only include user prompts (not system messages)
             if not msg.image_id:
                 conversation_history.append({
                     'role': 'user',
@@ -207,3 +214,56 @@ class MainWindow(QMainWindow):
             self.chat_area.add_error_message(f"Error generating tattoo: {str(e)}")
         finally:
             self.input_widget.set_loading(False)
+    
+    async def on_analyze_image(self, image_path: str, prompt: str):
+        """Handle image analysis request"""
+        if not self.mcp_client:
+            self.chat_area.add_error_message("Image analysis is not available. Please set ANTHROPIC_API_KEY.")
+            return
+        
+        if not self.current_session:
+            self.chat_area.add_error_message("Please select or create a chat session first.")
+            return
+        
+        # Show loading message
+        self.chat_area.add_user_message(f"🔍 Analyzing tattoo: {prompt}")
+        self.chat_area.show_loading()
+        
+        try:
+            # Request analysis through MCP
+            result = await self.mcp_client.analyze_image(image_path, self.current_session)
+            
+            # Hide loading
+            self.chat_area.hide_loading()
+            
+            if result["status"] == "success":
+                self.chat_area.hide_loading()
+                analysis_text = result["analysis"]
+                self.chat_area.add_user_message(f"🔍 Tattoo Analysis:\n\n{analysis_text}")
+            else:
+                self.chat_area.hide_loading()
+                self.chat_area.add_error_message(f"Analysis failed: {result.get('error', 'Unknown error')}")
+                
+        except Exception as e:
+            self.chat_area.hide_loading()
+            self.chat_area.add_error_message(f"Error during analysis: {str(e)}")
+    
+    async def refresh_chat_display(self):
+        """Refresh the chat display to show new messages"""
+        if not self.current_session:
+            return
+        
+        # Get the latest messages
+        messages = await self.chat_service.get_session_messages(self.current_session)
+        
+        # Find the last message we displayed
+        current_message_count = self.chat_area.message_layout.count()
+        
+        # Add only new messages
+        if len(messages) > current_message_count:
+            for message in messages[current_message_count:]:
+                if message.content.startswith("🔍 Tattoo Analysis:"):
+                    # This is an analysis message
+                    self.chat_area.add_user_message(message.content)
+                elif not message.content.startswith("Generated tattoo:"):
+                    self.chat_area.add_user_message(message.content)
