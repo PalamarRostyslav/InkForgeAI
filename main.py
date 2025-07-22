@@ -7,7 +7,6 @@ from qasync import QEventLoop, asyncSlot
 from frontend.main_window import MainWindow
 from config import Config
 
-
 class TattooAIApp:
     def __init__(self):
         self.app = QApplication(sys.argv)

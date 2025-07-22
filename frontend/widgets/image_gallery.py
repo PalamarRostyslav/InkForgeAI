@@ -40,7 +40,6 @@ class ImageThumbnail(QFrame):
         # Load image
         pixmap = QPixmap(self.image_path)
         if not pixmap.isNull():
-            # Create thumbnail
             thumbnail = pixmap.scaled(
                 150, 150,
                 Qt.AspectRatioMode.KeepAspectRatio,

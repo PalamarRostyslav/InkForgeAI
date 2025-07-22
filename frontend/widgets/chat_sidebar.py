@@ -8,7 +8,6 @@ import asyncio
 
 from backend.chat_service import ChatService
 
-
 class ChatListItem(QWidget):
     """Custom widget for chat list items with delete button"""
     delete_clicked = pyqtSignal(str)
@@ -62,7 +61,6 @@ class ChatListItem(QWidget):
         """Hide delete button when not hovering"""
         self.delete_btn.hide()
         super().leaveEvent(event)
-
 
 class ChatSidebar(QWidget):
     session_selected = pyqtSignal(str)
@@ -156,7 +154,6 @@ class ChatSidebar(QWidget):
     
     async def delete_session(self, session_id: str):
         """Delete a chat session"""
-        # Get session name for confirmation
         sessions = await self.chat_service.get_all_sessions()
         session = next((s for s in sessions if s.id == session_id), None)
         
@@ -173,13 +170,9 @@ class ChatSidebar(QWidget):
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            # Delete the session
             await self.chat_service.delete_session(session_id)
-            
-            # Refresh the list
             await self.refresh_sessions()
             
-            # Notify main window
             self.session_deleted.emit(session_id)
     
     def on_item_clicked(self, item: QListWidgetItem):

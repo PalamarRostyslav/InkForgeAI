@@ -8,7 +8,6 @@ import shutil
 
 from backend.models import ChatSession, ChatMessage, TattooImage
 
-
 class ChatService:
     def __init__(self, db_path: str = "data/chats.db"):
         self.db_path = db_path
@@ -182,10 +181,7 @@ class ChatService:
         return images
     
     async def delete_session(self, session_id: str):
-        """Delete a chat session and all associated data"""
-        # First, get all images for this session to delete files
-        images = await self.get_session_images(session_id)
-        
+        """Delete a chat session and all associated data"""        
         # Delete image files from file system
         image_dir = Path("data/images") / session_id
         if image_dir.exists():

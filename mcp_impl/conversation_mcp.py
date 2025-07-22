@@ -151,7 +151,6 @@ class TattooAnalysisMCP:
         async with stdio_server() as (read, write):
             await self.server.run(read, write)
 
-
 class MCPClient:
     """Client to communicate with the MCP server"""
     
@@ -169,7 +168,6 @@ class MCPClient:
             "image_path": image_path,
             "session_id": session_id
         })
-
 
 def run_mcp_server_thread(chat_service: ChatService, anthropic_api_key: str):
     """Run MCP server in a separate thread"""

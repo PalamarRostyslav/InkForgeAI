@@ -3,9 +3,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QComboBox, QLabel
 )
 from PyQt6.QtCore import pyqtSignal, Qt
-
 from backend.models import ImageSize, ImageQuality
-
 
 class InputWidget(QWidget):
     generate_clicked = pyqtSignal(str, ImageSize, ImageQuality) 
@@ -59,7 +57,7 @@ class InputWidget(QWidget):
         self.prompt_input = QTextEdit()
         self.prompt_input.setObjectName("promptInput")
         self.prompt_input.setPlaceholderText("Describe your tattoo design...")
-        self.prompt_input.setFixedHeight(50)  # Fixed height instead of max height
+        self.prompt_input.setFixedHeight(50)
         
         # Install event filter for Enter key
         self.prompt_input.installEventFilter(self)
@@ -83,8 +81,8 @@ class InputWidget(QWidget):
                 self.on_generate()
                 return True
             elif key_event.key() == Qt.Key.Key_Return and key_event.modifiers() == Qt.KeyboardModifier.ShiftModifier:
-                # Allow Shift+Enter for new line
                 return False
+            
         return super().eventFilter(obj, event)
     
     def on_generate(self):

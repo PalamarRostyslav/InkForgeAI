@@ -111,8 +111,6 @@ class MainWindow(QMainWindow):
     async def on_session_selected(self, session_id: str):
         """Handle session selection"""
         self.current_session = session_id
-        
-        # Clear current chat
         self.chat_area.clear()
         
         # Load messages
@@ -124,7 +122,6 @@ class MainWindow(QMainWindow):
         
         for message in messages:
             if message.image_id and message.image_id in image_map:
-                # This is a generated image message
                 image = image_map[message.image_id]
                 if message.content.startswith("Generated tattoo: "):
                     original_prompt = message.content.replace("Generated tattoo: ", "")
