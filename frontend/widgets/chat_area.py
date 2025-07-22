@@ -16,6 +16,7 @@ class ChatArea(QWidget):
         """Initialize the chat area UI"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        self.setMinimumHeight(900) 
         
         # Scroll area
         self.scroll_area = QScrollArea()
@@ -77,8 +78,6 @@ class ChatArea(QWidget):
     
     def add_image_message(self, prompt: str, image_path: str):
         """Add an image message to the chat"""
-        # Add prompt first
-        self.add_user_message(prompt)
         
         # Create image widget
         image_widget = QWidget()
@@ -93,9 +92,8 @@ class ChatArea(QWidget):
         # Load and display image
         pixmap = QPixmap(image_path)
         if not pixmap.isNull():
-            # Scale image to reasonable size
             scaled_pixmap = pixmap.scaled(
-                400, 400, 
+                600, 600,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
