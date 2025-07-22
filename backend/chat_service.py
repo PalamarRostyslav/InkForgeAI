@@ -4,8 +4,10 @@ from datetime import datetime
 from typing import List, Optional
 import uuid
 from pathlib import Path
+import shutil
 
 from backend.models import ChatSession, ChatMessage, TattooImage
+
 
 class ChatService:
     def __init__(self, db_path: str = "data/chats.db"):
@@ -179,6 +181,35 @@ class ChatService:
         
         return images
     
+    async def delete_session(self, session_id: str):
+        """Delete a chat session and all associated data"""
+        # First, get all images for this session to delete files
+        images = await self.get_session_images(session_id)
+        
+        # Delete image files from file system
+        image_dir = Path("data/images") / session_id
+        if image_dir.exists():
+            try:
+                shutil.rmtree(image_dir)
+            except Exception as e:
+                print(f"Error deleting image directory: {e}")
+        
+        # Delete from database
+        await self._execute_query(
+            'DELETE FROM chat_messages WHERE chat_session_id = ?',
+            (session_id,)
+        )
+        
+        await self._execute_query(
+            'DELETE FROM tattoo_images WHERE chat_session_id = ?',
+            (session_id,)
+        )
+        
+        await self._execute_query(
+            'DELETE FROM chat_sessions WHERE id = ?',
+            (session_id,)
+        )
+    
     async def _execute_query(self, query: str, params=None):
         """Execute a database query asynchronously"""
         loop = asyncio.get_event_loop()
@@ -210,4 +241,5 @@ class ChatService:
             cursor.execute(query)
         results = cursor.fetchall()
         conn.close()
+        
         return results

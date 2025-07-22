@@ -19,17 +19,26 @@ QListWidget#chatList {
 
 QListWidget#chatList::item {
     background-color: transparent;
-    border-radius: 8px;
-    padding: 12px;
+    border: none;
+    padding: 0;
     margin: 4px 8px;
-    color: #e0e0e0;
-}
-
-QListWidget#chatList::item:hover {
-    background-color: #2a2a2a;
 }
 
 QListWidget#chatList::item:selected {
+    background-color: transparent;
+}
+
+/* Chat List Item Widget Styles */
+ChatListItem {
+    background-color: transparent;
+    border-radius: 8px;
+}
+
+ChatListItem:hover {
+    background-color: #2a2a2a;
+}
+
+QListWidget#chatList::item:selected ChatListItem {
     background-color: #3a3a3a;
 }
 

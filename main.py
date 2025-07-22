@@ -1,7 +1,6 @@
 import sys
 import asyncio
 import signal
-from pathlib import Path
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtCore import QTimer
 from qasync import QEventLoop, asyncSlot
@@ -39,6 +38,7 @@ class TattooAIApp:
         original_on_generate = self.window.on_generate_tattoo
         original_on_session = self.window.on_session_selected
         original_on_new = self.window.on_new_session
+        original_on_delete = self.window.on_session_deleted
         
         @asyncSlot(str, object, object)
         async def async_generate(prompt, size, quality):
@@ -52,6 +52,10 @@ class TattooAIApp:
         async def async_new(session):
             await original_on_new(session)
         
+        @asyncSlot(str)
+        async def async_delete(session_id):
+            await original_on_delete(session_id)
+        
         # Replace with async versions
         self.window.input_widget.generate_clicked.disconnect()
         self.window.input_widget.generate_clicked.connect(async_generate)
@@ -61,6 +65,9 @@ class TattooAIApp:
         
         self.window.sidebar.new_session_created.disconnect()
         self.window.sidebar.new_session_created.connect(async_new)
+        
+        self.window.sidebar.session_deleted.disconnect()
+        self.window.sidebar.session_deleted.connect(async_delete)
     
     def show_api_key_error(self):
         """Show error dialog for missing API key"""

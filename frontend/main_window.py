@@ -1,3 +1,4 @@
+import sys
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QSplitter
@@ -47,6 +48,7 @@ class MainWindow(QMainWindow):
         self.sidebar.setObjectName("sidebar")
         self.sidebar.session_selected.connect(self.on_session_selected)
         self.sidebar.new_session_created.connect(self.on_new_session)
+        self.sidebar.session_deleted.connect(self.on_session_deleted)
         
         # Add visual separator
         sidebar_container = QWidget()
@@ -108,18 +110,25 @@ class MainWindow(QMainWindow):
         
         # Load messages
         messages = await self.chat_service.get_session_messages(session_id)
+        images = await self.chat_service.get_session_images(session_id)
+        
+        # Create a map of image IDs to image objects
+        image_map = {img.id: img for img in images}
+        
         for message in messages:
-            if message.image_id:
-                # Load image
-                images = await self.chat_service.get_session_images(session_id)
-                image = next((img for img in images if img.id == message.image_id), None)
-                if image:
-                    self.chat_area.add_image_message(message.content, image.image_path)
-            else:
+            if message.image_id and message.image_id in image_map:
+                image = image_map[message.image_id]
+                if message.content.startswith("Generated tattoo: "):
+                    original_prompt = message.content.replace("Generated tattoo: ", "")
+                else:
+                    original_prompt = message.content
+                
+                self.chat_area.add_user_message(original_prompt)
+                self.chat_area.add_image_message(original_prompt, image.image_path)
+            elif not message.content.startswith("Generated tattoo:"):
                 self.chat_area.add_user_message(message.content)
         
         # Load gallery images
-        images = await self.chat_service.get_session_images(session_id)
         self.gallery.clear()
         for image in images:
             self.gallery.add_image(image.image_path, image.prompt)
@@ -129,6 +138,14 @@ class MainWindow(QMainWindow):
         self.current_session = session.id
         self.chat_area.clear()
         self.gallery.clear()
+    
+    async def on_session_deleted(self, session_id: str):
+        """Handle session deletion"""
+        # If the deleted session was the current one, clear the UI
+        if self.current_session == session_id:
+            self.current_session = None
+            self.chat_area.clear()
+            self.gallery.clear()
     
     async def on_generate_tattoo(self, prompt: str, size, quality):
         """Handle tattoo generation with conversation context"""
@@ -147,6 +164,7 @@ class MainWindow(QMainWindow):
         conversation_history = []
         
         for msg in messages[:-1]:
+            # Only include user prompts (not system messages)
             if not msg.image_id:
                 conversation_history.append({
                     'role': 'user',
@@ -176,6 +194,13 @@ class MainWindow(QMainWindow):
             
             # Add to gallery
             self.gallery.add_image(image.image_path, prompt)
+            
+            # Save message with image reference
+            await self.chat_service.add_message(
+                self.current_session, 
+                f"Generated tattoo: {prompt}", 
+                image.id
+            )
             
         except Exception as e:
             self.chat_area.hide_loading()
