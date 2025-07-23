@@ -1,11 +1,149 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QGridLayout,
-    QLabel, QFrame, QPushButton, QFileDialog, QHBoxLayout
+    QLabel, QFrame, QPushButton, QFileDialog, QHBoxLayout, QDialog, QApplication
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap, QMouseEvent
+from PyQt6.QtGui import QPixmap, QMouseEvent, QKeyEvent
 import shutil
 from pathlib import Path
+
+class ImagePreviewDialog(QDialog):
+    """Full-size image preview dialog"""
+    
+    def __init__(self, image_path: str, prompt: str, parent=None):
+        super().__init__(parent)
+        self.image_path = image_path
+        self.prompt = prompt
+        self.init_ui()
+    
+    def init_ui(self):
+        """Initialize preview dialog UI"""
+        self.setWindowTitle("Tattoo Design Preview")
+        self.setModal(True)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1a1a1a;
+                border: 1px solid #3a3a3a;
+            }
+            QLabel {
+                color: #e0e0e0;
+            }
+            QPushButton {
+                background-color: #2a2a2a;
+                border: 1px solid #3a3a3a;
+                color: #e0e0e0;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 12px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #3a3a3a;
+                border: 1px solid #4a4a4a;
+            }
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Image display
+        self.image_label = QLabel()
+        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.image_label.setStyleSheet("""
+            QLabel {
+                border: 1px solid #3a3a3a;
+                background-color: #2a2a2a;
+                padding: 8px;
+                border-radius: 8px;
+            }
+        """)
+        
+        # Load and scale image
+        pixmap = QPixmap(self.image_path)
+        if not pixmap.isNull():
+            # Get screen size for reasonable max size
+            screen = QApplication.primaryScreen().geometry()
+            max_width = min(800, screen.width() - 100)
+            max_height = min(600, screen.height() - 200)
+            
+            scaled_pixmap = pixmap.scaled(
+                max_width, max_height,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.image_label.setPixmap(scaled_pixmap)
+        
+        layout.addWidget(self.image_label)
+        
+        # Prompt display
+        prompt_label = QLabel(f"Prompt: {self.prompt.strip()}")
+        prompt_label.setWordWrap(True)
+        prompt_label.setStyleSheet("""
+            color: #b0b0b0;
+            font-size: 13px;
+            padding: 12px;
+            background-color: #252525;
+            border-radius: 4px;
+            border: 1px solid #3a3a3a;
+            margin: 0px;
+        """)
+        prompt_label.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(prompt_label)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        # Export button
+        export_btn = QPushButton("Export")
+        export_btn.clicked.connect(self.export_image)
+        button_layout.addWidget(export_btn)
+        
+        # Close button
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.close)
+        button_layout.addWidget(close_btn)
+        
+        layout.addLayout(button_layout)
+        
+        # Set reasonable size
+        self.resize(max_width + 50, max_height + 150)
+        
+        # Center on screen
+        self.center_on_screen()
+    
+    def center_on_screen(self):
+        """Center dialog on screen"""
+        screen = QApplication.primaryScreen().geometry()
+        dialog_geometry = self.geometry()
+        x = (screen.width() - dialog_geometry.width()) // 2
+        y = (screen.height() - dialog_geometry.height()) // 2
+        self.move(x, y)
+    
+    def keyPressEvent(self, event: QKeyEvent):
+        """Handle key press events"""
+        if event.key() == Qt.Key.Key_Escape:
+            self.close()
+        else:
+            super().keyPressEvent(event)
+    
+    def export_image(self):
+        """Export image to user-selected location"""
+        file_name = Path(self.image_path).name
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Tattoo Design",
+            file_name,
+            "PNG Files (*.png);;All Files (*)"
+        )
+        
+        if save_path:
+            try:
+                shutil.copy2(self.image_path, save_path)
+                print(f"Image exported to: {save_path}")
+            except Exception as e:
+                print(f"Error exporting image: {e}")
 
 
 class ImageThumbnail(QFrame):
@@ -46,10 +184,11 @@ class ImageThumbnail(QFrame):
                 Qt.TransformationMode.SmoothTransformation
             )
             
-            image_label = QLabel()
-            image_label.setPixmap(thumbnail)
-            image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            layout.addWidget(image_label)
+            self.image_label = QLabel()
+            self.image_label.setPixmap(thumbnail)
+            self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.image_label.setCursor(Qt.CursorShape.PointingHandCursor)
+            layout.addWidget(self.image_label)  # Now this matches
         
         # Add prompt preview with larger font
         prompt_label = QLabel(self.prompt[:50] + "..." if len(self.prompt) > 50 else self.prompt)
@@ -106,8 +245,15 @@ class ImageThumbnail(QFrame):
     def mousePressEvent(self, event: QMouseEvent):
         """Handle mouse click"""
         if event.button() == Qt.MouseButton.LeftButton:
-            if event.position().y() < 160:
-                self.clicked.emit(self.image_path)
+            clicked_widget = self.childAt(event.position().toPoint())
+            
+            if clicked_widget == self.image_label:
+                self.show_preview()
+                
+    def show_preview(self):
+        """Show full-size image preview"""
+        preview_dialog = ImagePreviewDialog(self.image_path, self.prompt, self)
+        preview_dialog.exec()
     
     def export_image(self):
         """Export image to user-selected location"""
